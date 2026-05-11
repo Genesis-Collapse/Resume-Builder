@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, X, Check, Bell, Clock,
   ChevronLeft, ChevronRight, Calendar, CheckCircle2,
   FileText, Briefcase, RefreshCw, AlertCircle, Info, ChevronDown, Maximize2,
-  ExternalLink, Link, Loader
+  ExternalLink, Link, Loader, ListChecks
 } from 'lucide-react';
 
 import { logActivity, todoToPastTense, getActivities, removeActivityByTitle, timeAgo } from './activityLogger';
-import { getAccessToken, signInWithGoogle } from './firebase';
-import { fetchGoogleEvents, createGoogleEvent, getMonthRange } from './googleCalendar';
 
 // ══════════════════════════════════════════════════════════════
 //  MOCK DATA
@@ -159,41 +157,22 @@ const Badge = ({ text }) => {
 //  ADD EVENT MODAL
 // ══════════════════════════════════════════════════════════════
 
-function AddEventModal({ date, onClose, onAdd, googleConnected }) {
+function AddEventModal({ date, onClose, onAdd, onAddTodo }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [time, setTime] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [syncToGoogle, setSyncToGoogle] = useState(googleConnected);
-  const [saving, setSaving] = useState(false);
+  const [addToTodo, setAddToTodo] = useState(false);
   const colors = ['#7C3AED', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899'];
   const [color, setColor] = useState(colors[0]);
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
     if (!title.trim()) return;
-    setSaving(true);
     const event = { id: `ev${Date.now()}`, date, title: title.trim(), description: description.trim(), color, time, deadline: deadline || undefined };
-    
-    if (syncToGoogle && googleConnected) {
-      try {
-        const token = getAccessToken();
-        if (token) {
-          const startTime = time ? `${date}T${time}:00` : null;
-          const endTime = time ? (() => {
-            const d = new Date(`${date}T${time}:00`);
-            d.setHours(d.getHours() + 1);
-            return d.toISOString();
-          })() : null;
-          const gcalEvent = await createGoogleEvent(token, { ...event, startTime, endTime });
-          event.id = gcalEvent.id;
-          event.isGoogleEvent = true;
-          event.htmlLink = gcalEvent.htmlLink;
-        }
-      } catch (e) { console.error('Google Calendar sync failed:', e); }
-    }
-    
     onAdd(event);
-    setSaving(false);
+    if (addToTodo && onAddTodo) {
+      onAddTodo(title.trim(), `Event on ${date}${time ? ` at ${time}` : ''}`);
+    }
     onClose();
   };
 
@@ -211,8 +190,14 @@ function AddEventModal({ date, onClose, onAdd, googleConnected }) {
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Event title..."
           autoFocus className="sleek-input" style={{ marginBottom: 12 }}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }} />
-        <input value={time} onChange={e => setTime(e.target.value)} type="time"
-          className="sleek-input" style={{ marginBottom: 12 }} />
+        
+        {/* Time input with prominent white clock icon */}
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <input value={time} onChange={e => setTime(e.target.value)} type="time"
+            className="sleek-input" style={{ paddingRight: 44 }} />
+          <Clock size={20} color="#FFFFFF" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        </div>
+        
         <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)..."
           className="sleek-textarea" rows={2} style={{ marginBottom: 12, resize: 'none' }} />
 
@@ -235,17 +220,18 @@ function AddEventModal({ date, onClose, onAdd, googleConnected }) {
             ))}
           </div>
         </div>
-        {googleConnected && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={syncToGoogle} onChange={e => setSyncToGoogle(e.target.checked)}
-              style={{ accentColor: '#7C3AED' }} />
-            <Calendar size={13} /> Sync to Google Calendar
-          </label>
-        )}
-        <button onClick={handleAdd} disabled={saving}
+
+        {/* Add to Todo List checkbox */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={addToTodo} onChange={e => setAddToTodo(e.target.checked)}
+            style={{ accentColor: '#7C3AED' }} />
+          <ListChecks size={13} /> Add to Todo List
+        </label>
+
+        <button onClick={handleAdd}
           style={{ width: '100%', padding: '10px 0', borderRadius: 6, border: 'none', background: 'var(--accent)', color: 'var(--bg-app)',
-            fontWeight: 600, fontSize: 13, cursor: saving ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Saving...' : 'Add Event'}
+            fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Add Event
         </button>
       </motion.div>
     </motion.div>
@@ -374,12 +360,8 @@ export default function PipelineDashboard() {
     return !localStorage.getItem('deadline-hint-dismissed');
   });
 
-  // Google Calendar state
-  const [googleEvents, setGoogleEvents] = useState([]);
-  const [gcalLoading, setGcalLoading] = useState(false);
-  const [eventDetail, setEventDetail] = useState(null); // popover for event click
-  const [gcalConnecting, setGcalConnecting] = useState(false);
-  const googleConnected = !!getAccessToken();
+  const [eventDetail, setEventDetail] = useState(null);
+  const notifiedRef = useRef(new Set(JSON.parse(localStorage.getItem('notified-events') || '[]')));
 
   // Sync recent activity
   useEffect(() => {
@@ -395,34 +377,59 @@ export default function PipelineDashboard() {
   const [calView, setCalView] = useState('Month');
   const [eventModal, setEventModal] = useState(null);
 
-  // Fetch Google Calendar events when month changes or on mount
-  const syncGoogleCalendar = useCallback(async () => {
-    const token = getAccessToken();
-    if (!token) { setGoogleEvents([]); return; }
-    setGcalLoading(true);
-    try {
-      const { timeMin, timeMax } = getMonthRange(calYear, calMonth);
-      const fetched = await fetchGoogleEvents(token, timeMin, timeMax);
-      setGoogleEvents(fetched);
-    } catch (err) {
-      if (err.message === 'TOKEN_EXPIRED') {
-        setGoogleEvents([]);
-      }
-      console.error('Google Calendar sync error:', err);
-    } finally { setGcalLoading(false); }
-  }, [calYear, calMonth]);
+  // All events are local only
+  const allEvents = events;
 
-  useEffect(() => { syncGoogleCalendar(); }, [syncGoogleCalendar]);
-
-  // Listen for auth changes to re-sync
+  // ── EVENT NOTIFICATION SYSTEM ──
   useEffect(() => {
-    const handler = () => syncGoogleCalendar();
-    window.addEventListener('google-auth-changed', handler);
-    return () => window.removeEventListener('google-auth-changed', handler);
-  }, [syncGoogleCalendar]);
+    // Request notification permission on mount
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
-  // Merge local + Google events
-  const allEvents = [...events, ...googleEvents.filter(ge => !events.some(e => e.id === ge.id))];
+    const checkNotifications = () => {
+      const nowCheck = new Date();
+      const nowH = String(nowCheck.getHours()).padStart(2, '0');
+      const nowM = String(nowCheck.getMinutes()).padStart(2, '0');
+      const nowTime = `${nowH}:${nowM}`;
+      const todayISO = fmt(nowCheck.getFullYear(), nowCheck.getMonth(), nowCheck.getDate());
+
+      events.forEach(ev => {
+        if (ev.time && ev.date === todayISO && ev.time === nowTime && !notifiedRef.current.has(ev.id)) {
+          notifiedRef.current.add(ev.id);
+          localStorage.setItem('notified-events', JSON.stringify([...notifiedRef.current]));
+
+          // Browser notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`⏰ ${ev.title}`, {
+              body: ev.description || `Scheduled for ${ev.time}`,
+              icon: '🔔',
+              tag: ev.id
+            });
+          }
+
+          // In-app toast notification
+          const toast = document.createElement('div');
+          toast.className = 'event-notification-toast';
+          toast.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🔔</span><div><strong>${ev.title}</strong><br/><span style="font-size:11px;opacity:0.7">${ev.description || 'Event is now!'}</span></div></div>`;
+          Object.assign(toast.style, {
+            position: 'fixed', bottom: '24px', right: '24px', background: '#7C3AED',
+            color: '#fff', padding: '16px 20px', borderRadius: '12px', zIndex: '99999',
+            boxShadow: '0 12px 40px rgba(124,58,237,0.4)', fontFamily: 'Inter, sans-serif',
+            fontSize: '13px', animation: 'slideInRight 0.4s ease, fadeOut 0.5s ease 4.5s forwards',
+            cursor: 'pointer', maxWidth: '320px'
+          });
+          toast.onclick = () => toast.remove();
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 5000);
+        }
+      });
+    };
+
+    const interval = setInterval(checkNotifications, 15000); // Check every 15 seconds
+    checkNotifications(); // Check immediately on mount
+    return () => clearInterval(interval);
+  }, [events]);
 
   // Persist & notify Activity tracker
   useEffect(() => {
@@ -469,7 +476,10 @@ export default function PipelineDashboard() {
     setTodos(t => [...t, { id: `t${Date.now()}`, title, subtitle, linkedTo, checked: false, priority: 'normal' }]);
     setAddingTodo(false);
   };
-  const addEvent = ev => { setEvents(e => [...e, ev]); syncGoogleCalendar(); };
+  const addTodoFromEvent = (title, subtitle) => {
+    setTodos(t => [...t, { id: `t${Date.now()}`, title, subtitle, checked: false, priority: 'normal' }]);
+  };
+  const addEvent = ev => { setEvents(e => [...e, ev]); };
 
   // Persist dismissed event deadline IDs
   useEffect(() => {
@@ -531,20 +541,6 @@ export default function PipelineDashboard() {
     }
   };
 
-  // Connect Google Calendar from Pipeline
-  const handleConnectGoogle = async () => {
-    setGcalConnecting(true);
-    try {
-      await signInWithGoogle();
-      window.dispatchEvent(new CustomEvent('google-auth-changed'));
-      syncGoogleCalendar();
-    } catch (e) {
-      console.error('Google Calendar connect failed:', e);
-    } finally {
-      setGcalConnecting(false);
-    }
-  };
-
   // Build calendar grid
   const daysInMonth = getDaysInMonth(calYear, calMonth);
   const firstDay = getFirstDayOfMonth(calYear, calMonth);
@@ -568,18 +564,6 @@ export default function PipelineDashboard() {
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-main)' }}>Pipeline Insights</h1>
-        {!googleConnected && (
-          <button onClick={handleConnectGoogle} disabled={gcalConnecting}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8,
-              border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-muted)',
-              fontSize: 12, cursor: gcalConnecting ? 'wait' : 'pointer', fontFamily: 'inherit', fontWeight: 500,
-              transition: 'all 0.15s', opacity: gcalConnecting ? 0.6 : 1
-            }}>
-            <svg width="14" height="14" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-            {gcalConnecting ? 'Connecting...' : 'Sync Google Calendar'}
-          </button>
-        )}
       </motion.div>
 
       {/* 3-COLUMN LAYOUT */}
@@ -739,18 +723,7 @@ export default function PipelineDashboard() {
               })}
             </div>
 
-            {/* Google Calendar sync indicator */}
-            {googleConnected && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '6px 10px', borderRadius: 6, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <Calendar size={12} color="#10B981" />
-                <span style={{ fontSize: 11, color: '#10B981', fontWeight: 500 }}>
-                  {gcalLoading ? 'Syncing...' : 'Google Calendar connected'}
-                </span>
-                <button onClick={syncGoogleCalendar} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#10B981', display: 'flex', padding: 2 }}>
-                  <RefreshCw size={12} className={gcalLoading ? 'spin' : ''} />
-                </button>
-              </div>
-            )}
+
 
           </PanelCard>
         </motion.div>
@@ -816,7 +789,7 @@ export default function PipelineDashboard() {
 
       {/* EVENT MODAL */}
       <AnimatePresence>
-        {eventModal && <AddEventModal date={eventModal} onClose={() => setEventModal(null)} onAdd={addEvent} googleConnected={googleConnected} />}
+        {eventModal && <AddEventModal date={eventModal} onClose={() => setEventModal(null)} onAdd={addEvent} onAddTodo={addTodoFromEvent} />}
       </AnimatePresence>
 
       {/* EVENT DETAIL POPOVER */}
@@ -851,17 +824,7 @@ export default function PipelineDashboard() {
                   <Badge text={deadlineUrgency(eventDetail.deadline)} />
                 </div>
               )}
-              {eventDetail.isGoogleEvent && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', color: '#10B981' }}>GOOGLE CALENDAR</span>
-                </div>
-              )}
-              {eventDetail.htmlLink && (
-                <a href={eventDetail.htmlLink} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#7C3AED', textDecoration: 'none', fontWeight: 500 }}>
-                  <ExternalLink size={12} /> Open in Google Calendar
-                </a>
-              )}
+
             </motion.div>
           </motion.div>
         )}

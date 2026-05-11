@@ -475,11 +475,18 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
   const imgRef = useRef(null);
   const containerSize = 280;
 
+  // WYSIWYG Filter state
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [grayscale, setGrayscale] = useState(0);
+  const [blur, setBlur] = useState(0);
+
   // Determine shape from the current template
   const shape = TEMPLATE_PHOTO_SHAPES[templateId] || 'circle';
   const isCircle = shape === 'circle';
   const borderRadiusCSS = isCircle ? '50%' : '12%';
-  const canvasCornerRadius = 48; // px out of 400 for the rounded square
+  const canvasCornerRadius = 48;
 
   useEffect(() => {
     const img = new Image();
@@ -500,7 +507,6 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
   };
   const handleMouseUp = () => setDragging(false);
 
-  // Helper: draw a rounded rect path on a canvas context
   const roundedRectPath = (ctx, x, y, w, h, r) => {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -515,11 +521,14 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
     ctx.closePath();
   };
 
+  // Build CSS filter string for WYSIWYG preview
+  const filterCSS = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
+
   const applyCrop = () => {
     const canvas = canvasRef.current;
     if (!canvas || !imgRef.current) return;
     const ctx = canvas.getContext('2d');
-    const size = 400; // output size
+    const size = 400;
     canvas.width = size;
     canvas.height = size;
     const img = imgRef.current;
@@ -528,6 +537,9 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
     const dh = img.height * scale;
     const dx = (size / 2) - (dw / 2) + (offset.x * (size / containerSize));
     const dy = (size / 2) - (dh / 2) + (offset.y * (size / containerSize));
+
+    // Apply filters to canvas
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
 
     // Clip to the appropriate shape
     if (isCircle) {
@@ -540,7 +552,6 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
     }
 
     ctx.drawImage(img, dx, dy, dw, dh);
-    // Use PNG so transparent corners stay transparent (no black)
     onApply(canvas.toDataURL('image/png'));
   };
 
@@ -552,95 +563,137 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
       position: 'absolute',
       left: '50%', top: '50%',
       transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      filter: filterCSS
     };
   })() : {};
 
-  // Gridlines overlay (rule of thirds)
+  const resetAll = () => {
+    setZoom(1); setOffset({ x: 0, y: 0 });
+    setBrightness(100); setContrast(100); setSaturation(100); setGrayscale(0); setBlur(0);
+  };
+
+  // Gridlines overlay
   const Gridlines = () => (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2 }}>
-      {/* Vertical lines */}
       <div style={{ position: 'absolute', left: '33.33%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.25)' }} />
       <div style={{ position: 'absolute', left: '66.66%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.25)' }} />
-      {/* Horizontal lines */}
       <div style={{ position: 'absolute', top: '33.33%', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.25)' }} />
       <div style={{ position: 'absolute', top: '66.66%', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.25)' }} />
-      {/* Center crosshair */}
       <div style={{ position: 'absolute', left: '50%', top: 'calc(50% - 8px)', width: 1, height: 16, background: 'rgba(255,255,255,0.4)', transform: 'translateX(-50%)' }} />
       <div style={{ position: 'absolute', top: '50%', left: 'calc(50% - 8px)', height: 1, width: 16, background: 'rgba(255,255,255,0.4)', transform: 'translateY(-50%)' }} />
+    </div>
+  );
+
+  // Filter slider helper
+  const FilterSlider = ({ label, value, onChange, min, max, step, unit = '%' }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)' }}>
+        <span>{label}</span>
+        <span>{value}{unit}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        style={{ width: '100%', accentColor: '#7C3AED', height: 4, cursor: 'pointer' }} />
     </div>
   );
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onCancel}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+      <motion.div initial={{ scale: 0.95, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 10 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         onClick={e => e.stopPropagation()}
-        style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: 16, padding: 28, width: 380, boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Crop size={18} /> Crop & Position
-          </h3>
-          <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer' }}><X size={18} /></button>
+        style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: 20, padding: 32, width: 740, maxWidth: '90vw', boxShadow: '0 24px 80px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+              <Crop size={20} color="#7C3AED" /> Photo Editor
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Adjust crop and apply filters to match your resume style.</p>
+          </div>
+          <button onClick={onCancel} style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-faint)', cursor: 'pointer', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}><X size={16} /></button>
         </div>
 
-        {/* Shape label */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-faint)', background: 'rgba(255,255,255,0.06)', padding: '4px 12px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-            {isCircle ? '● Circle' : '▢ Rounded Square'} — matches "{templateId}" template
-          </span>
-        </div>
+        {/* Main Content Area: 2 Columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 32 }}>
+          
+          {/* Left Column: Crop Preview */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: 24, borderRadius: 16, border: '1px solid rgba(255,255,255,0.05)' }}>
+            
+            {/* Shape label */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-faint)', background: 'rgba(255,255,255,0.08)', padding: '6px 14px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {isCircle ? <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#7C3AED' }}/> : <div style={{ width: 8, height: 8, borderRadius: 2, background: '#7C3AED' }}/>}
+                {isCircle ? 'Circle Match' : 'Square Match'} — {templateId} template
+              </span>
+            </div>
 
-        {/* Crop preview */}
-        <div
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          style={{
-            width: containerSize, height: containerSize, borderRadius: borderRadiusCSS, overflow: 'hidden',
-            position: 'relative', margin: '0 auto 20px', cursor: dragging ? 'grabbing' : 'grab',
-            border: '3px solid rgba(255,255,255,0.15)', background: '#111'
-          }}>
-          {imgRef.current && <img src={src} alt="" style={imgStyle} />}
-          {!imgRef.current && <img src={src} alt="" onLoad={(e) => { imgRef.current = e.target; setZoom(z => z); }}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-          <Gridlines />
-        </div>
+            {/* WYSIWYG Crop preview */}
+            <div
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              style={{
+                width: containerSize, height: containerSize, borderRadius: borderRadiusCSS, overflow: 'hidden',
+                position: 'relative', margin: '0 auto', cursor: dragging ? 'grabbing' : 'grab',
+                border: '4px solid rgba(255,255,255,0.1)', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
+              }}>
+              {imgRef.current && <img src={src} alt="" style={imgStyle} />}
+              {!imgRef.current && <img src={src} alt="" onLoad={(e) => { imgRef.current = e.target; setZoom(z => z); }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', filter: filterCSS }} />}
+              <Gridlines />
+            </div>
 
-        {/* Zoom control */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '0 12px' }}>
-          <ZoomOut size={16} color="var(--text-faint)" />
-          <input type="range" min={0.5} max={3} step={0.05} value={zoom}
-            onChange={e => setZoom(Number(e.target.value))}
-            style={{ flex: 1, accentColor: '#7C3AED' }} />
-          <ZoomIn size={16} color="var(--text-faint)" />
-          <span style={{ fontSize: 11, color: 'var(--text-faint)', minWidth: 36, textAlign: 'right' }}>{Math.round(zoom * 100)}%</span>
-        </div>
+            {/* Zoom control below preview */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24, width: '100%', maxWidth: 280 }}>
+              <ZoomOut size={16} color="var(--text-faint)" />
+              <input type="range" min={0.5} max={3} step={0.05} value={zoom}
+                onChange={e => setZoom(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#7C3AED' }} />
+              <ZoomIn size={16} color="var(--text-faint)" />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8 }}>Zoom: {Math.round(zoom * 100)}%</div>
+          </div>
 
-        {/* Reset */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <button onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}
-            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
-            <RotateCcw size={12} /> Reset
-          </button>
-        </div>
+          {/* Right Column: Filters Sidebar */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', borderRadius: 12, padding: '20px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)', marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Activity size={14} color="#7C3AED" /> Image Adjustments
+              </div>
+              
+              <FilterSlider label="Brightness" value={brightness} onChange={setBrightness} min={20} max={200} step={1} />
+              <FilterSlider label="Contrast" value={contrast} onChange={setContrast} min={20} max={200} step={1} />
+              <FilterSlider label="Saturation" value={saturation} onChange={setSaturation} min={0} max={200} step={1} />
+              <FilterSlider label="Grayscale" value={grayscale} onChange={setGrayscale} min={0} max={100} step={1} />
+              <FilterSlider label="Blur" value={blur} onChange={setBlur} min={0} max={10} step={0.1} unit="px" />
+              
+              <button onClick={resetAll}
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', width: '100%', padding: '8px 0', borderRadius: 6, marginTop: 24, transition: 'all 0.2s' }}>
+                <RotateCcw size={12} /> Reset to Default
+              </button>
+            </div>
 
-        <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', marginBottom: 16, lineHeight: 1.5 }}>
-          Drag to reposition • Use slider to zoom • Shape matches your template
-        </p>
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onCancel}
-            style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={applyCrop}
-            style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: 'none', background: '#7C3AED', color: '#FFF', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Apply Crop
-          </button>
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={onCancel}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}>
+                Cancel
+              </button>
+              <button onClick={applyCrop}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: 'none', background: '#7C3AED', color: '#FFF', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>
+                Apply Changes
+              </button>
+            </div>
+            
+          </div>
         </div>
+        
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </motion.div>
     </motion.div>
