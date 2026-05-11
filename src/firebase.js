@@ -30,9 +30,6 @@ try {
 // ══════════════════════════════════════════════════════════════
 
 const googleProvider = new GoogleAuthProvider();
-// Request Google Calendar read/write scope
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
 
 /**
  * Sign in with Google and request Calendar scopes.

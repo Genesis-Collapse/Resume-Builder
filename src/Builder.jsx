@@ -28,18 +28,30 @@ const DEFAULT = {
     email:"alex@mercer.design", phone:"+1 (415) 555-0192",
     location:"San Francisco, CA", linkedin:"linkedin.com/in/alexmercer",
     website:"mercer.design",
-    summary:"Passionate product designer with 7+ years turning complex problems into elegant, human-centered interfaces.",
+    summary:"Passionate product designer with 7+ years turning complex problems into elegant, human-centered interfaces. Adept at creating comprehensive design systems and leading cross-functional teams to deliver scalable digital products.",
     photo: null,
   },
-  education:[{id:"e1",institution:"Stanford University",degree:"B.S. Design Engineering",year:"2017",gpa:"3.9"}],
+  education:[
+    {id:"e1",institution:"Stanford University",degree:"M.S. Human-Computer Interaction",year:"2019",gpa:"4.0"},
+    {id:"e2",institution:"University of California, Berkeley",degree:"B.A. Graphic Design",year:"2017",gpa:"3.8"}
+  ],
   experience:[
     {id:"x1",company:"Stripe",role:"Senior Product Designer",duration:"Jan 2021 – Present",location:"San Francisco, CA",
-      bullets:["Led end-to-end redesign of the Stripe Dashboard, cutting task completion time by 34%.","Established the company-wide Sail design system."]},
+      bullets:["Led end-to-end redesign of the Stripe Dashboard, cutting task completion time by 34%.","Established the company-wide Sail design system, increasing designer efficiency by 40%.","Mentored a team of 4 junior designers, fostering a culture of continuous learning."]},
+    {id:"x2",company:"Airbnb",role:"Product Designer",duration:"Mar 2019 – Dec 2020",location:"San Francisco, CA",
+      bullets:["Designed the 'Online Experiences' platform from 0 to 1 during the 2020 pandemic.","Collaborated with engineering to implement pixel-perfect responsive layouts.","Conducted weekly user testing sessions to iterate rapidly on core flows."]},
   ],
-  skills:{ design:["Figma","Sketch","Framer"], technical:["HTML/CSS","React","Git"], soft:["Systems Thinking","Stakeholder Management"] },
-  projects: [],
-  references: [],
-  customSections: [],
+  skills:{ design:["Figma","Sketch","Framer", "Prototyping"], technical:["HTML/CSS","React","Git", "Webflow"], soft:["Systems Thinking","Stakeholder Management", "Agile Leadership"] },
+  projects: [
+    {id:"p1",title:"Sail Design System",linkText:"sail.stripe.com",linkUrl:"https://stripe.com",bullets:["Comprehensive React UI library used across 12 product surfaces.","Reduced code duplication by 60% within the first year."]},
+    {id:"p2",title:"Nomad - Travel Planner app",linkText:"nomad.app",linkUrl:"https://example.com",bullets:["Personal side project with 10k+ active users.","Featured on Product Hunt as #2 Product of the Day."]}
+  ],
+  references: [
+    {id:"r1",name:"John Smith",title:"Design Director",company:"Stripe",email:"john.smith@example.com",phone:"+1 (555) 123-4567",relationship:"Former Manager"}
+  ],
+  customSections: [
+    {id:"c1", title:"Awards & Certifications", content:"<ul><li><strong>Google UX Design Certificate</strong> (2021)</li><li><strong>Awwwards Site of the Day</strong> (2020) for outstanding web interaction design.</li></ul>"}
+  ],
   settings: {
     templateId: 'modern', formatId: 'chronological', accentColor: '#3B82F6', headerAlignment: 'left',
     fontSize: 12, pageCount: 1, sectionSpacing: 16, pagePadding: 36, fontFamily: 'Inter',
@@ -481,6 +493,7 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
   const [saturation, setSaturation] = useState(100);
   const [grayscale, setGrayscale] = useState(0);
   const [blur, setBlur] = useState(0);
+  const [bgColor, setBgColor] = useState('#000000'); // Default to black for logos
 
   // Determine shape from the current template
   const shape = TEMPLATE_PHOTO_SHAPES[templateId] || 'circle';
@@ -551,6 +564,14 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
       ctx.clip();
     }
 
+    // Fill background inside the clipped area
+    if (bgColor !== 'transparent') {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, size, size);
+    } else {
+      ctx.clearRect(0, 0, size, size);
+    }
+
     ctx.drawImage(img, dx, dy, dw, dh);
     onApply(canvas.toDataURL('image/png'));
   };
@@ -586,17 +607,43 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
   );
 
   // Filter slider helper
-  const FilterSlider = ({ label, value, onChange, min, max, step, unit = '%' }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)' }}>
-        <span>{label}</span>
-        <span>{value}{unit}</span>
+  const FilterSlider = ({ label, value, onChange, min, max, step, unit = '%' }) => {
+    const handleWheel = (e) => {
+      const { deltaX, deltaY } = e;
+      if (deltaX === 0 && deltaY === 0) return;
+
+      // Decide whether horizontal or vertical scroll is dominant
+      let scrollValue = 0;
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        scrollValue = deltaX; // Right positive, Left negative
+      } else {
+        scrollValue = -deltaY; // Up negative (negated to positive), Down positive (negated to negative)
+      }
+
+      if (scrollValue === 0) return;
+
+      // Multiplier makes fast swipes adjust more quickly
+      const multiplier = Math.max(1, Math.abs(scrollValue) / 15);
+      const delta = (scrollValue > 0 ? 1 : -1) * step * multiplier;
+
+      onChange(Math.min(max, Math.max(min, value + delta)));
+    };
+
+    return (
+      <div 
+        onWheel={handleWheel}
+        style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)' }}>
+          <span>{label}</span>
+          <span>{Math.round(value)}{unit}</span>
+        </div>
+        <input type="range" min={min} max={max} step={step} value={value}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{ width: '100%', accentColor: '#7C3AED', height: 4, cursor: 'pointer' }} />
       </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        style={{ width: '100%', accentColor: '#7C3AED', height: 4, cursor: 'pointer' }} />
-    </div>
-  );
+    );
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -640,7 +687,9 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
               style={{
                 width: containerSize, height: containerSize, borderRadius: borderRadiusCSS, overflow: 'hidden',
                 position: 'relative', margin: '0 auto', cursor: dragging ? 'grabbing' : 'grab',
-                border: '4px solid rgba(255,255,255,0.1)', background: '#111', boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
+                border: '4px solid rgba(255,255,255,0.1)', 
+                background: bgColor === 'transparent' ? 'repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 16px 16px' : bgColor, 
+                boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
               }}>
               {imgRef.current && <img src={src} alt="" style={imgStyle} />}
               {!imgRef.current && <img src={src} alt="" onLoad={(e) => { imgRef.current = e.target; setZoom(z => z); }}
@@ -649,11 +698,22 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
             </div>
 
             {/* Zoom control below preview */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24, width: '100%', maxWidth: 280 }}>
+            <div 
+              onWheel={(e) => {
+                const { deltaX, deltaY } = e;
+                if (deltaX === 0 && deltaY === 0) return;
+                let scrollValue = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : -deltaY;
+                if (scrollValue === 0) return;
+                const multiplier = Math.max(1, Math.abs(scrollValue) / 15);
+                const delta = (scrollValue > 0 ? 1 : -1) * 0.05 * multiplier;
+                setZoom(Math.min(3, Math.max(0.5, zoom + delta)));
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24, width: '100%', maxWidth: 280 }}
+            >
               <ZoomOut size={16} color="var(--text-faint)" />
               <input type="range" min={0.5} max={3} step={0.05} value={zoom}
                 onChange={e => setZoom(Number(e.target.value))}
-                style={{ flex: 1, accentColor: '#7C3AED' }} />
+                style={{ flex: 1, accentColor: '#7C3AED', cursor: 'pointer' }} />
               <ZoomIn size={16} color="var(--text-faint)" />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8 }}>Zoom: {Math.round(zoom * 100)}%</div>
@@ -671,11 +731,28 @@ function PhotoCropModal({ src, onApply, onCancel, templateId }) {
               <FilterSlider label="Contrast" value={contrast} onChange={setContrast} min={20} max={200} step={1} />
               <FilterSlider label="Saturation" value={saturation} onChange={setSaturation} min={0} max={200} step={1} />
               <FilterSlider label="Grayscale" value={grayscale} onChange={setGrayscale} min={0} max={100} step={1} />
-              <FilterSlider label="Blur" value={blur} onChange={setBlur} min={0} max={10} step={0.1} unit="px" />
+              <FilterSlider label="Blur" value={blur} onChange={setBlur} min={0} max={10} step={0.5} unit="px" />
               
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-main)', marginBottom: 12, marginTop: 24, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Layers size={12} color="#7C3AED" /> Canvas Fill
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[
+                  { id: 'transparent', label: 'None', bg: 'repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 50% / 12px 12px' },
+                  { id: '#000000', label: 'Black', bg: '#000000' },
+                  { id: '#FFFFFF', label: 'White', bg: '#FFFFFF' }
+                ].map(c => (
+                  <button key={c.id} onClick={() => setBgColor(c.id)}
+                    style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: `1px solid ${bgColor === c.id ? '#7C3AED' : 'rgba(255,255,255,0.1)'}`, background: 'var(--bg-input)', color: 'var(--text-main)', fontSize: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, background: c.bg, border: '1px solid rgba(255,255,255,0.2)' }} />
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+
               <button onClick={resetAll}
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', width: '100%', padding: '8px 0', borderRadius: 6, marginTop: 24, transition: 'all 0.2s' }}>
-                <RotateCcw size={12} /> Reset to Default
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', width: '100%', padding: '8px 0', borderRadius: 6, marginTop: 20, transition: 'all 0.2s' }}>
+                <RotateCcw size={12} /> Reset
               </button>
             </div>
 
