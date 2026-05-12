@@ -144,6 +144,67 @@ const THEME_CSS = `
     --accent-bg: rgba(255, 255, 255, 0.08);
   }
 
+  @media (max-width: 768px) {
+    .dashboard-shell {
+      flex-direction: column !important;
+    }
+    .sidebar-panel {
+      width: 100% !important;
+      height: auto !important;
+      flex-direction: row !important;
+      flex-wrap: wrap;
+      padding: 12px !important;
+      border-right: none !important;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .sidebar-panel > div:first-child {
+      margin-bottom: 16px !important;
+      width: 100%;
+    }
+    .sidebar-panel nav {
+      flex-direction: row !important;
+      overflow-x: auto;
+      gap: 8px;
+      padding-bottom: 8px;
+    }
+    .main-content {
+      flex: 1 !important;
+    }
+    .editor-container {
+      flex-direction: column !important;
+      overflow-y: auto !important;
+    }
+    .editor-panel, .preview-panel {
+      width: 100% !important;
+      height: auto !important;
+      flex: none !important;
+      overflow: visible !important;
+    }
+    .editor-panel {
+      padding: 16px !important;
+    }
+    .preview-panel {
+      padding: 16px !important;
+    }
+    .no-print.resizer {
+      display: none !important;
+    }
+    header.no-print {
+      flex-direction: column;
+      height: auto !important;
+      padding: 12px 16px !important;
+      gap: 12px;
+    }
+    .cloud-resumes-grid {
+      grid-template-columns: 1fr !important;
+    }
+    #resume-pdf-target {
+      transform: scale(0.6);
+      transform-origin: top left;
+      margin-bottom: -40%;
+    }
+  }
+
   .dashboard-shell {
     font-family: 'Inter', sans-serif;
     color: var(--text-main);
@@ -1327,13 +1388,14 @@ function CloudResumes({ onSelect }) {
   };
 
   const deleteResume = async (id) => {
-    if(!window.confirm("Are you sure?")) return;
+    if(!window.confirm("Are you sure you want to delete this resume?")) return;
     if (!user) return;
     try {
-      await deleteDoc(doc(db, "users", user.uid, "resumes", id));
+      await deleteDoc(doc(db, "users", user.uid, "resumes", String(id)));
       setResumes(r => r.filter(x => x.id !== id));
     } catch(e) {
-      console.error(e);
+      console.error("Error deleting resume:", e);
+      alert("Failed to delete resume. Please try again.");
     }
   };
 
@@ -1356,7 +1418,7 @@ function CloudResumes({ onSelect }) {
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: 0.5 }}>Completed Resume Drafts</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 24 }}>
+      <div className="cloud-resumes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 24 }}>
         
         {/* Create New Card */}
         <div 
@@ -1401,8 +1463,8 @@ function CloudResumes({ onSelect }) {
                 Edit Resume
               </button>
               <button 
-                onClick={() => deleteResume(r.id)} 
-                style={{ flex: 1, background: "transparent", color: "var(--text-main)", border: "1px solid var(--border-color)", padding: "10px 0", borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer", transition: "background 0.2s" }} 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteResume(r.id); }} 
+                style={{ flex: 1, background: "transparent", color: "var(--text-main)", border: "1px solid var(--border-color)", padding: "10px 0", borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer", transition: "background 0.2s", position: "relative", zIndex: 10 }} 
                 onMouseEnter={e => e.target.style.background = "var(--bg-input)"} 
                 onMouseLeave={e => e.target.style.background = "transparent"}
               >
@@ -1518,7 +1580,7 @@ function DashboardInner() {
       <div className="dashboard-shell" style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         
         {/* SIDEBAR */}
-        <div style={{ width: 220, background: "var(--bg-sidebar)", borderRight: "1px solid var(--border-color)", display: "flex", flexDirection: "column", flexShrink: 0, padding: "24px 16px" }}>
+        <div className="sidebar-panel" style={{ width: 220, background: "var(--bg-sidebar)", borderRight: "1px solid var(--border-color)", display: "flex", flexDirection: "column", flexShrink: 0, padding: "24px 16px" }}>
           <div 
             onClick={() => setShowExitWarning(true)}
             style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 600, marginBottom: 40, color: "var(--text-main)", paddingLeft: 8, cursor: "pointer", transition: "opacity 0.15s" }}
@@ -1573,7 +1635,7 @@ function DashboardInner() {
         </div>
 
         {/* MAIN CONTENT AREA */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div className="main-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           
           {/* TOP BAR */}
           <header className="no-print" style={{ height: 60, borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 32px" }}>
@@ -1599,12 +1661,12 @@ function DashboardInner() {
           </header>
 
           {/* DYNAMIC VIEW */}
-          <div style={{ flex: 1, overflowY: "hidden", display: "flex", userSelect: isResizing ? 'none' : 'auto' }}>
+          <div className="editor-container" style={{ flex: 1, overflowY: "hidden", display: "flex", userSelect: isResizing ? 'none' : 'auto' }}>
             {activeTab === 'Editor' ? (
               <>
                 <EditorPanel width={editorWidth} />
                 <div 
-                  className="no-print"
+                  className="no-print resizer"
                   onMouseDown={() => setIsResizing(true)}
                   style={{ 
                     width: 6, cursor: "col-resize", background: isResizing ? "var(--accent)" : "transparent",
@@ -1614,7 +1676,9 @@ function DashboardInner() {
                   onMouseEnter={(e) => { if(!isResizing) e.currentTarget.style.background = "var(--border-color)"; }}
                   onMouseLeave={(e) => { if(!isResizing) e.currentTarget.style.background = "transparent"; }}
                 />
-                <div style={{ width: `${100 - editorWidth}%`, background: "var(--bg-app)", padding: "40px", overflow: "auto" }}>
+                <div 
+                  className="preview-panel"
+                  style={{ width: `${100 - editorWidth}%`, background: "var(--bg-app)", padding: "40px", overflow: "auto" }}>
                    <div id="resume-pdf-target" style={{ width: "fit-content", margin: "0 auto" }}>
                      <LivePreview />
                    </div>
