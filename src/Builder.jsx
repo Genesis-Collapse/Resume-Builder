@@ -1278,22 +1278,26 @@ function LivePreview() {
         {scale < 1 && <span style={{ color: "#F59E0B" }}> • Scaled to {Math.round(scale * 100)}% to fit</span>}
       </div>
       <div style={{
-        width: 794, // A4 width at 96dpi
-        minHeight: pageHeight,
-        maxHeight: pageHeight,
-        overflow: "hidden",
-        background: "#FFF",
         boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
         margin: "0 auto",
-        position: "relative"
+        width: 794
       }}>
-        <div ref={contentRef} style={{
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          width: `${100 / scale}%`,
-          minHeight: `${100 / scale}%`,
+        <div id="resume-pdf-target" style={{
+          width: 794, // A4 width at 96dpi
+          minHeight: pageHeight,
+          maxHeight: pageHeight,
+          overflow: "hidden",
+          background: "#FFF",
+          position: "relative"
         }}>
-          <Tmpl data={data} />
+          <div ref={contentRef} style={{
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+            width: `${100 / scale}%`,
+            minHeight: `${100 / scale}%`,
+          }}>
+            <Tmpl data={data} />
+          </div>
         </div>
       </div>
     </div>
@@ -1704,7 +1708,7 @@ function DashboardInner() {
                 <div 
                   className="preview-panel"
                   style={{ width: `${100 - editorWidth}%`, background: "var(--bg-app)", padding: "40px", overflow: "auto" }}>
-                   <div id="resume-pdf-target" style={{ width: "fit-content", margin: "0 auto" }}>
+                   <div style={{ width: "fit-content", margin: "0 auto" }}>
                      <LivePreview />
                    </div>
                 </div>
