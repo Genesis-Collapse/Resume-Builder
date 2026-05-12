@@ -1261,7 +1261,7 @@ function LivePreview() {
     const pageHeightPx = data.settings.pageCount * 1122; // A4 at 96dpi ≈ 1122px
     const contentHeight = contentRef.current.scrollHeight;
     if (contentHeight > pageHeightPx) {
-      setScale(Math.max(0.65, pageHeightPx / contentHeight));
+      setScale(pageHeightPx / contentHeight);
     } else {
       setScale(1);
     }
@@ -1557,7 +1557,7 @@ function DashboardInner() {
       filename:     'resume.pdf',
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
     html2pdf().set(opt).from(element).save();
     logActivity({ type: 'export_pdf', title: 'Exported Resume as PDF', detail: data.title || 'Untitled Resume' });
