@@ -1019,9 +1019,43 @@ function ExperienceForm() {
   );
 }
 
+function SkillInputCategory({ catKey, label, ph, data, dispatch }) {
+  const [text, setText] = useState(() => data.skills[catKey].join(", "));
+
+  useEffect(() => {
+    const dataText = data.skills[catKey].join(", ");
+    const currentParsed = text.split(",").map(s => s.trim()).filter(Boolean).join(", ");
+    if (currentParsed !== dataText) {
+      setText(dataText);
+    }
+  }, [data.skills, catKey]);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setText(val);
+    dispatch({
+      type: "SET_SKILLS",
+      cat: catKey,
+      value: val.split(",").map(s => s.trim()).filter(Boolean)
+    });
+  };
+
+  return (
+    <SleekField label={label}>
+      <input className="sleek-input" value={text} onChange={handleChange} placeholder={ph}/>
+      {data.skills[catKey].length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+          {data.skills[catKey].map((s,i) => (
+            <span key={i} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", padding: "4px 8px", borderRadius: 4, color: "var(--text-main)" }}>{s}</span>
+          ))}
+        </div>
+      )}
+    </SleekField>
+  );
+}
+
 function SkillsForm() {
   const {data,dispatch}=useData();
-  const set=cat=>e=>dispatch({type:"SET_SKILLS",cat,value:e.target.value.split(",").map(s=>s.trim()).filter(Boolean)});
   const cats=[
     {key:"design",label:"Design Tools",ph:"Figma, Sketch, Framer..."},
     {key:"technical",label:"Technical",ph:"HTML, CSS, React, Git..."},
@@ -1031,16 +1065,7 @@ function SkillsForm() {
     <div style={{ marginBottom: 40 }}>
       <SectionHeader title="Skills & Tools" />
       {cats.map(({key,label,ph})=>(
-        <SleekField key={key} label={label}>
-          <input className="sleek-input" value={data.skills[key].join(", ")} onChange={set(key)} placeholder={ph}/>
-          {data.skills[key].length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-              {data.skills[key].map((s,i) => (
-                <span key={i} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", padding: "4px 8px", borderRadius: 4, color: "var(--text-main)" }}>{s}</span>
-              ))}
-            </div>
-          )}
-        </SleekField>
+        <SkillInputCategory key={key} catKey={key} label={label} ph={ph} data={data} dispatch={dispatch} />
       ))}
     </div>
   );
