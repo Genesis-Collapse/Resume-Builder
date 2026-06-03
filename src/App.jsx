@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "./AuthContext";
 import LandingPage from "./LandingPage";
 import Builder from "./Builder";
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/templates" element={<TemplatePicker />} />
           <Route path="/builder" element={<Builder />} />
         </Routes>
+        <Analytics />
       </BrowserRouter>
     </AuthProvider>
   );
