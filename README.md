@@ -22,7 +22,7 @@ A modern, highly interactive React web application that allows users to create, 
 * **Styling:** Tailwind CSS
 * **Animations:** Framer Motion
 * **PDF Generation:** `html2pdf.js` / `react-to-print` (or equivalent)
-* **Development Environment:** Scaffolded and built using Google Antigravity & Claude.
+
 
 ---
 
