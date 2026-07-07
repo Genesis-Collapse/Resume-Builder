@@ -1,10 +1,10 @@
-# 📄 Dynamic Resume Builder
+#  Dynamic Resume Builder
 
 A modern, highly interactive React web application that allows users to create, preview, and download professional resumes in real-time. Built with a focus on UI/UX, this app features a seamless split-screen layout, smooth micro-interactions, and multiple professional templates.
 
 ---
 
-## ✨ Features
+##  Features
 
 * **Split-Screen Interface:** A data entry form on the left and a dynamically updating live preview on the right.
 * **Real-Time Live Preview:** See your resume update instantly as you type.
@@ -15,7 +15,7 @@ A modern, highly interactive React web application that allows users to create, 
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 * **Frontend Framework:** React (Functional Components & Hooks)
 * **Build Tool:** Vite (for lightning-fast HMR and optimised builds)
@@ -26,7 +26,7 @@ A modern, highly interactive React web application that allows users to create, 
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 To get a local copy up and running, follow these simple steps.
 
@@ -53,7 +53,7 @@ Make sure you have Node.js and npm installed on your machine.
    npm run dev
 
 
-## 📂 Architecture Overview
+##  Architecture Overview
 The project is structured for scalability and separation of concerns:
 
 src/components/form/ — Contains modular inputs for Personal Info, Experience, Education, etc.
@@ -64,10 +64,10 @@ src/templates/ — Houses the distinct resume layout components (Modern, Minimal
 
 src/context/ — Manages the global state (form data, selected template, and auth status) to feed both the form and preview panels.
 
-## 🤝 Contributing
+##  Contributing
 Contributions, issues, and feature requests are welcome! Feel free to check the issues page if you want to contribute.
 
-## 📝 License
+##  License
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## React + Vite
